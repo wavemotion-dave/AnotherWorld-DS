@@ -48,7 +48,7 @@ installed a playable version of the game, you can find these files in the C:\ANO
 To start the game, you must :
 - create a directory at the root of your SD card named RAW
 - put all the game's datafiles in the directory named RAW 
-- run antoherworld.nds
+- run AnotherWorld-DS.nds
 
 That's all, AnotherWorldDS can be run.
 
@@ -67,13 +67,13 @@ Credits:
 
 Thanks Wintermute for devkitpro and libnds (http://www.devkitpro.org).
   Eric Chahi, Delphine Software, obviously, for making this great game.
-  Gregory Montoir, cyx@users.sourceforge.net (original Raw for PC)
+  Gregory Montoir, cyx@users.sourceforge.net (original RAW engine for PC)
   
 Massive thanks to Alekmaul for the original 1.0 port.
 
 History :
 -----------------------
-V1.1 : 23-Nov-2026
+V1.1 : by wavemotion-dave on 23-Nov-2026
   * Resurrected from the ashes.
   * Major sound rework and improvements.
   * Fixes for running on DSi/XL/LL and via Twilight Menu++ or Unlaunch.
@@ -84,5 +84,5 @@ V1.1 : 23-Nov-2026
   * START key now properly pauses the game.
   * Other minor fixes and improvements as time permitted.
 
-V1.0 : 16/07/2011
+V1.0 : by Alekmaul on 16/07/2011
   * Initial release based on newraw engine

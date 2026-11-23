@@ -253,7 +253,7 @@ static inline u32 expandNibbles(u32 h) {
          ((h & 0x0000F000) << 4) | ((h & 0x00000F00) << 16);
 }
 
-void SDLStub::copyRect(uint16 x, uint16 y, uint16 w, uint16 h, const uint8 *buf, uint32 pitch) {
+ITCM_CODE void SDLStub::copyRect(uint16 x, uint16 y, uint16 w, uint16 h, const uint8 *buf, uint32 pitch) {
   //buf += y * pitch + x;
   u8 *dst = (u8 *)bgGetGfxPtr(bg0);               // 512-byte stride bitmap
   const bool aligned = (((u32)buf | pitch) & 3) == 0;
@@ -286,7 +286,7 @@ void SDLStub::copyRect(uint16 x, uint16 y, uint16 w, uint16 h, const uint8 *buf,
 }
 
 
-void SDLStub::processEvents() {
+ITCM_CODE void SDLStub::processEvents() {
   int keypressed=keysCurrent();
   
   _pi.dirMask &= ~PlayerInput::DIR_UP;
@@ -348,7 +348,7 @@ static volatile u32 sBlock = 0;       // block the ARM7 play head is in (approx.
 Mixer *theMixer = 0;
 
 // Fires every MIX_BLOCK samples, locked to the hardware sample clock.
-static void audioBlockIrq(void) {
+ITCM_CODE static void audioBlockIrq(void) {
   const u32 mask = (BUFFER_SIZ / MIX_BLOCK) - 1;
   sBlock = (sBlock + 1) & mask;
   u32 next = (sBlock + 1) & mask;

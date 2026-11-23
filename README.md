@@ -83,6 +83,7 @@ V1.1 : by wavemotion-dave on 23-Nov-2026
   * Added 'SAVED' icon when saving game.
   * START key now properly pauses the game.
   * Other minor fixes and improvements as time permitted.
+  * 1.1a - hotfix to make save state write atomic
 
 V1.0 : by Alekmaul on 16/07/2011
   * Initial release based on newraw engine

@@ -64,7 +64,7 @@ void Engine::finish() {
 void Engine::forceLoadState()
 {
     _stub->_pi.load = true;
-    force_load=5;
+    force_load=2;
 }
 
 ITCM_CODE void Engine::processInput()
@@ -115,42 +115,60 @@ void Engine::makeGameStateName(uint8 slot, char *buf) {
 
 void Engine::saveGameState(uint8 slot, const char *desc) {
     char stateFile[20];
+    char tempFile[20];
+    char statePath[256];
+    char tempPath[256];
 
-    // Show the 'SAVED' status
     DSPrint(12,20,0, (char*)"!\"#$\%&'");
     DSPrint(12,21,0,(char*)"ABCDEFG");
     remove_saved = 3;
 
     makeGameStateName(slot, stateFile);
+    makeGameStateName(99, tempFile);
+
+    // Same joining the File class does internally; adjust the separator
+    // to match how File::open builds its path (check for trailing '/').
+    snprintf(statePath, sizeof(statePath), "%s/%s", _saveDir, stateFile);
+    snprintf(tempPath,  sizeof(tempPath),  "%s/%s", _saveDir, tempFile);
+
     File f(true);
-    if (!f.open(stateFile, _saveDir, "wb")) {
-        warning("Unable to save state file '%s'", stateFile);
-    } else {
-        // header
-        uint32_t magic = ((uint32_t)'A' << 24) |
-                 ((uint32_t)'W' << 16) |
-                 ((uint32_t)'S' << 8)  |
-                 ((uint32_t)'V');
+    if (!f.open(tempFile, _saveDir, "wb")) {
+        warning("Unable to save state file '%s'", tempFile);
+        return;
+    }
 
-        f.writeUint32BE(magic);
+    uint32_t magic = ((uint32_t)'A' << 24) | ((uint32_t)'W' << 16) |
+                     ((uint32_t)'S' << 8)  |  (uint32_t)'V';
+    f.writeUint32BE(magic);
+    f.writeUint16BE(Serializer::CUR_VER);
+    f.writeUint16BE(0);
 
-        f.writeUint16BE(Serializer::CUR_VER);
-        f.writeUint16BE(0);
-        char hdrdesc[32];
-        strncpy(hdrdesc, desc, sizeof(hdrdesc) - 1);
-        f.write(hdrdesc, sizeof(hdrdesc));
-        // contents
-        Serializer s(&f, Serializer::SM_SAVE, _res._memPtrStart);
-        _log.saveOrLoad(s);
-        _res.saveOrLoad(s);
-        _vid.saveOrLoad(s);
-        _ply.saveOrLoad(s);
-        _mix.saveOrLoad(s);
-        if (f.ioErr()) {
-            warning("I/O error when saving game state");
-        } else {
-            debug(DBG_INFO, "Saved state to slot %d", _stateSlot);
-        }
+    char hdrdesc[32];
+    memset(hdrdesc, 0, sizeof(hdrdesc));          // see note below
+    strncpy(hdrdesc, desc, sizeof(hdrdesc) - 1);
+    f.write(hdrdesc, sizeof(hdrdesc));
+
+    Serializer s(&f, Serializer::SM_SAVE, _res._memPtrStart);
+    _log.saveOrLoad(s);
+    _res.saveOrLoad(s);
+    _vid.saveOrLoad(s);
+    _ply.saveOrLoad(s);
+    _mix.saveOrLoad(s);
+
+    bool ioError = f.ioErr();
+    f.close();
+
+    if (ioError) {
+        warning("I/O error when saving game state");
+        remove(tempPath);                          // don't keep a bad temp file
+        return;
+    }
+
+    debug(DBG_INFO, "Saved state to slot %d", slot);
+
+    remove(statePath);                            // libfat rename fails if dest exists
+    if (rename(tempPath, statePath) != 0) {
+        warning("Unable to rename '%s' to '%s'", tempPath, statePath);
     }
 }
 

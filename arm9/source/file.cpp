@@ -70,17 +70,34 @@ struct stdFile : File_impl {
 
 struct zlibFile : File_impl {
 	gzFile _fp;
-	zlibFile() : _fp(0) {}
+	uint8 *_buf;      // in-memory copy of the file being written
+	uint32 _len, _cap;
+	bool _wr;
+	zlibFile() : _fp(0), _buf(0), _len(0), _cap(0), _wr(false) {}
+
 	bool open(const char *path, const char *mode) {
 		_ioErr = false;
+		_len = 0;
+		_wr = (mode[0] == 'w');
 		_fp = gzopen(path, mode);
 		return (_fp != NULL);
 	}
 	void close() {
 		if (_fp) {
-			gzclose(_fp);
+			// write mode: everything goes to the card in one gzwrite here
+			if (_wr && _len && !_ioErr) {
+				if (gzwrite(_fp, _buf, _len) != (int)_len) {
+					_ioErr = true;
+				}
+			}
+			if (gzclose(_fp) != Z_OK) {
+				_ioErr = true;
+			}
 			_fp = 0;
 		}
+		free(_buf);
+		_buf = 0;
+		_len = _cap = 0;
 	}
 	void seek(int32 off) {
 		if (_fp) {
@@ -96,12 +113,24 @@ struct zlibFile : File_impl {
 		}
 	}
 	void write(void *ptr, uint32 size) {
-		if (_fp) {
-			uint32 r = gzwrite(_fp, ptr, size);
-			if (r != size) {
-				_ioErr = true;
-			}
+		if (!_fp) return;
+		if (!_wr) {                       // not a write-mode file, shouldn't happen
+			if ((uint32)gzwrite(_fp, ptr, size) != size) _ioErr = true;
+			return;
 		}
+		if (_len + size > _cap) {
+			uint32 ncap = _cap ? _cap : 32 * 1024;
+			while (ncap < _len + size) ncap *= 2;
+			uint8 *nb = (uint8 *)realloc(_buf, ncap);
+			if (!nb) {
+				_ioErr = true;
+				return;
+			}
+			_buf = nb;
+			_cap = ncap;
+		}
+		memcpy(_buf + _len, ptr, size);
+		_len += size;
 	}
 };
 

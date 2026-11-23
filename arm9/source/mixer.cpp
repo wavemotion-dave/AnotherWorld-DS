@@ -25,7 +25,7 @@
 // headroom for several channels. Raise to 3 or 4 if the output is too quiet.
 #define MIX_GAIN 3
 
-// Largest block handled in one pass (accumulator - on stack so can't be too large)
+// Largest block handled in one pass (accumulator - static so as to not take up stack)
 #define MIX_MAX_BLOCK 512
 
 Mixer::Mixer(SystemStub *stub) 
@@ -84,7 +84,7 @@ void Mixer::stopAll() {
 // per-sample channel loop and keeps each channel's state in registers.
 ITCM_CODE static void mixBlock(Mixer *m, s16 *buf, int len) 
 {
-	int32 acc[MIX_MAX_BLOCK];
+	static int32 acc[MIX_MAX_BLOCK];
 
 	memset(acc, 0, len * sizeof(int32));
 

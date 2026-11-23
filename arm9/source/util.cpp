@@ -36,7 +36,6 @@ void debug(uint16 cm, const char *msg, ...) {
 
 void error(const char *msg, ...) 
 {
-#if 0
     char buf[256];
     va_list va;
     va_start(va, msg);
@@ -50,7 +49,6 @@ void error(const char *msg, ...)
        ;
     while (keysCurrent())
        ;
-#endif       
     exit(-1);
 }
 

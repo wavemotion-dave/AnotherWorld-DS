@@ -24,10 +24,18 @@
 #include "serializer.h"
 #include "video.h"
 
+static uint8_t RESOURCE_MEM_BLOCK[Resource::MEM_BLOCK_SIZE];
 
-Resource::Resource(Video *vid, const char *dataDir) 
+
+Resource::Resource(Video *vid, const char *dataDir)
     : _vid(vid), _dataDir(dataDir) {
   _curPtrsId = 0;
+  _newPtrsId = 0;
+  _numMemList = 0;
+  _useSegVideo2 = false;
+  _segVideoPal = _segCode = _segVideo1 = _segVideo2 = 0;
+  _scriptBakPtr = _scriptCurPtr = _vidBakPtr = _vidCurPtr = _memPtrStart = 0;
+  memset(_memList, 0, sizeof(_memList));
 }
 
 void Resource::readBank(const MemEntry *me, uint8 *dstBuf) {
@@ -172,7 +180,7 @@ void Resource::setupPtrs(uint16 ptrId) {
             ivd1 = _memListParts[part][2];
             ivd2 = _memListParts[part][3];
         } else {
-            error("Resource::setupPtrs() ec=0x%X invalid ptrId", 0xF07);
+            error("Resource::setupPtrs() ec=0x%X invalid ptrId [%08X]", 0xF07, ptrId);
         }
         invalidateAll();
         _memList[ipal].valid = 2;
@@ -194,14 +202,16 @@ void Resource::setupPtrs(uint16 ptrId) {
 }
 
 void Resource::allocMemBlock() {
-    _memPtrStart = (uint8 *)malloc(MEM_BLOCK_SIZE);
+    _memPtrStart = (uint8 *)RESOURCE_MEM_BLOCK;
     _scriptBakPtr = _scriptCurPtr = _memPtrStart;
     _vidBakPtr = _vidCurPtr = _memPtrStart + MEM_BLOCK_SIZE - 0x800 * 16;
     _useSegVideo2 = false;
+    _newPtrsId = 0;
+    _curPtrsId = 0;
 }
 
 void Resource::freeMemBlock() {
-    free(_memPtrStart);
+    // Nothing to release, no allocation done
 }
 
 void Resource::saveOrLoad(Serializer &ser) {

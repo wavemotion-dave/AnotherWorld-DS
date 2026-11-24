@@ -89,6 +89,7 @@ V1.1 : by wavemotion-dave on 23-Nov-2026
   * Other minor fixes and improvements as time permitted.
   * 1.1a - hotfix to make save state write atomic
   * 1.1b - hotfix for uninitialized memory on resource creation (causing crash)
+  * 1.1c - hotfix for music sounding sometimes rough after restore state
 
 V1.0 : by Alekmaul on 16/07/2011
   * Initial release based on newraw engine

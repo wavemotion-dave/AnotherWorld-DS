@@ -43,28 +43,27 @@ typedef enum {
  *
  * SAMPLE_PERIOD must be exactly 2x the ARM7 channel timer period
  * (ARM7 timer runs at half the ARM9 bus clock). For a 22050 Hz request a
- * libnds-style ARM7 ends up with period 760, hence 1520 here. If your ARM7
- * code computes the channel period differently, change SAMPLE_PERIOD to
- * 2 * (that period). Both sides then run on the same clock and never drift.
+ * libnds-style ARM7 ends up with period 760, hence 1520 here.
+ * Both sides then run on the same clock and never drift. Hopefully!
  *
  * Each IRQ the play head is at the start of block sBlock; we fill block
  * sBlock+1, so latency is roughly one to two blocks (12-23 ms).
- */
-#define BUFFER_SIZ     2048                      // ring size in samples (mono s16)
-#define MIX_BLOCK      256                       // samples per mix call
-#define SAMPLE_PERIOD  1520                      // ARM9 ticks per sample
+ */                                               
+#define BUFFER_SIZ     2048                       // ring size in samples (mono s16)
+#define MIX_BLOCK      256                        // samples per mix call
+#define SAMPLE_PERIOD  1520                       // ARM9 ticks per sample
 #define OUTPUT_RATE    (33513982 / SAMPLE_PERIOD) // 22048 Hz
 
 #define  cxBG (0<<8)
-#define  cyBG (0<<8)     //(20<<8);
-#define  xdxBG (((320 / 256) << 8) | (320 % 256))
-#define  ydyBG (((200 / 192) << 8) | (200 % 192))
+#define  cyBG (0<<8)
+#define  xdxBG (((320 / 256) << 8) | (320 % 256))   // Original version runs 320x200
+#define  ydyBG (((200 / 192) << 8) | (200 % 192))   // so we have to have some screen compression
 
 extern int bg0, bg1, bg0b, bg1b;
 
 volatile u32 emuFps;                     // Fps to display
 volatile u32 emuActFrames;               // Actual number of frames 
-volatile u16 g_framePending = 0;           // To manage Vcount and VBL Interrupt
+volatile u16 g_framePending = 0;         // To manage Vcount and VBL Interrupt
 
 ITCM_CODE void vblankIntr() 
 {
@@ -84,7 +83,7 @@ ITCM_CODE void vblankIntr()
     REG_BG2Y = cyBG;
 
     REG_BG3X = cxBG+96;
-    REG_BG3Y = cyBG+20; 
+    REG_BG3Y = cyBG+16; 
 
     if(++sTime >= 60) 
     {
@@ -118,9 +117,6 @@ struct SDLStub : SystemStub {
     
     static const Scaler _scalers[];
 
-    uint8 *_offscreen;
-    //ALEK SDL_Surface *_screen;
-    //ALEK SDL_Surface *_sclscreen;
     bool _fullscreen;
     uint8 _scaler;
     uint16 _pal[16];
@@ -171,14 +167,8 @@ void timer0_function( void ) {
 } 
 
 void SDLStub::init(const char *title) {
-    memset(&_pi, 0, sizeof(_pi));
-  if (_offscreen) free(_offscreen);
-    _offscreen = (uint8 *)malloc(SCREEN_W * SCREEN_H * 2);
-/*
-    if (!_offscreen) {
-        error("Unable to allocate offscreen buffer");
-    }
-*/
+  memset(&_pi, 0, sizeof(_pi));
+
   // Prepare DS graphic mode
   videoSetMode(MODE_5_2D | DISPLAY_BG2_ACTIVE | DISPLAY_BG3_ACTIVE);
   vramSetBankA(VRAM_A_MAIN_BG_0x06000000);
@@ -198,7 +188,7 @@ void SDLStub::init(const char *title) {
   REG_BG2Y = cyBG; 
   REG_BG3X = cxBG; 
   REG_BG3Y = cyBG; 
-  REG_BG2PA = xdxBG ; 
+  REG_BG2PA = xdxBG; 
   REG_BG2PD = ydyBG; 
   REG_BG3PA = xdxBG; 
   REG_BG3PD = ydyBG; 
@@ -229,8 +219,7 @@ void SDLStub::destroy() {
   TIMER2_CR = 0;
   TIMER3_CR = 0;
 
-    cleanupGfxMode();
-    //ALEK SDL_Quit();
+  cleanupGfxMode();
 }
 
 void SDLStub::setPalette(uint8 s, uint8 n, const uint8 *buf) {
@@ -254,7 +243,6 @@ static inline u32 expandNibbles(u32 h) {
 }
 
 ITCM_CODE void SDLStub::copyRect(uint16 x, uint16 y, uint16 w, uint16 h, const uint8 *buf, uint32 pitch) {
-  //buf += y * pitch + x;
   u8 *dst = (u8 *)bgGetGfxPtr(bg0);               // 512-byte stride bitmap
   const bool aligned = (((u32)buf | pitch) & 3) == 0;
 
@@ -332,7 +320,6 @@ uint32 SDLStub::getTimeStamp() {
 }
 
 void SDLStub::sleep(uint32 duration) {
-//ALEK  SDL_Delay(duration);
   uint32 debtime=getTimeStamp();
   while (getTimeStamp()-debtime<duration);
 }
@@ -392,9 +379,6 @@ void SDLStub::stopAudio() {
   irqDisable(IRQ_TIMER2);
   TIMER1_CR = 0;
   TIMER2_CR = 0;
-    //ALEK SDL_CloseAudio();
-  // (the ARM7 channel keeps looping silence/stale data; send EMUARM7_STOP_SND
-  //  here if your ARM7 handler supports it)
 }
 
 uint32 SDLStub::getOutputSampleRate() {
@@ -424,7 +408,6 @@ void TimerCallBackEvent(void) {
 }
 
 void *SDLStub::addTimer(uint32 delay, TimerCallback callback, void *param) {
-    // ALEK return SDL_AddTimer(delay, (SDL_NewTimerCallback)callback, param);
   if (delay != 0 && delay < 1000) {
     thePlayer = (SfxPlayer *) param;
     TIMER3_CR = 0;
@@ -442,7 +425,6 @@ void *SDLStub::addTimer(uint32 delay, TimerCallback callback, void *param) {
 }
 
 void SDLStub::removeTimer(void *timerId) {
-    //ALEK SDL_RemoveTimer((SDL_TimerID)timerId);
   TIMER3_CR = 0;
   irqDisable(IRQ_TIMER3);
 }
@@ -457,16 +439,14 @@ static int s_savedIME  = 0;
 
 unsigned int fake_mutex = 0x1122ABCD;
 void *SDLStub::createMutex() {
-    //ALEK return SDL_CreateMutex();
     return (void*) fake_mutex;
 }
 
 void SDLStub::destroyMutex(void *mutex) {
-    //ALEK SDL_DestroyMutex((SDL_mutex *)mutex);
+
 }
 
 void SDLStub::lockMutex(void *mutex) {
-    //ALEK SDL_mutexP((SDL_mutex *)mutex);
   int ime = REG_IME;
   REG_IME = 0;
   if (s_lockDepth++ == 0) {
@@ -475,37 +455,16 @@ void SDLStub::lockMutex(void *mutex) {
 }
 
 void SDLStub::unlockMutex(void *mutex) {
-    //ALEK SDL_mutexV((SDL_mutex *)mutex);
   if (--s_lockDepth == 0) {
     REG_IME = s_savedIME;
   }
 }
 
 void SDLStub::prepareGfxMode() {
-    /*ALEK
-  int w = SCREEN_W * _scalers[_scaler].factor;
-    int h = SCREEN_H * _scalers[_scaler].factor;
-  
-    _screen = SDL_SetVideoMode(w, h, 16, VIDEO_MODE);
 
-    if (!_screen) {
-        error("SDLStub::prepareGfxMode() unable to allocate _screen buffer");
-    }
-    _sclscreen = SDL_CreateRGBSurface(SDL_SWSURFACE, w, h, 16,
-                        _screen->format->Rmask,
-                        _screen->format->Gmask,
-                        _screen->format->Bmask,
-                        _screen->format->Amask);
-    if (!_sclscreen) {
-        error("SDLStub::prepareGfxMode() unable to allocate _sclscreen buffer");
-    }*/
 }
 
 void SDLStub::cleanupGfxMode() {
-    if (_offscreen) {
-        free(_offscreen);
-        _offscreen = 0;
-    }
 }
 
 void SDLStub::switchGfxMode(bool fullscreen, uint8 scaler) {

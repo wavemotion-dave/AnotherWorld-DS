@@ -119,6 +119,15 @@ void DSPrint(int iX, int iY, int iScr, char *szMessage)
     }
 }
 
+#include <new>
+
+// ----------------------------------------------------
+// Reserve at least sizeof(Engine) bytes in DTCM.
+// We allocate the entire engine class in fast memory.
+// This is roughly 8K and is half our DTCM memory!
+// ----------------------------------------------------
+__attribute__((section(".dtcm"), aligned(8), used))
+static unsigned char g_engineDtcmStorage[sizeof(Engine)];
 
 #undef main
 int main(int argc, char *argv[])
@@ -178,80 +187,69 @@ int main(int argc, char *argv[])
         }
     }
 
-  while(etatEmu != RAW_QUITSTDS) 
-  {
-    switch (etatEmu) 
+    while(etatEmu != RAW_QUITSTDS) 
     {
-      case RAW_MENUINIT:
-        // Init BG mode for 8 bits colors , tiles mode
-        extern s16 sound_buffer[2048];
-        memset(sound_buffer, 0x00, sizeof(sound_buffer));
+      switch (etatEmu) 
+      {
+        case RAW_MENUINIT:
+          // Init BG mode for 8 bits colors , tiles mode
+          extern s16 sound_buffer[2048];
+          memset(sound_buffer, 0x00, sizeof(sound_buffer));
 #if 1 // Set to 0 to use iprintf()
-        videoSetMode(MODE_0_2D | DISPLAY_BG0_ACTIVE );
-        videoSetModeSub(MODE_0_2D | DISPLAY_BG0_ACTIVE | DISPLAY_BG1_ACTIVE | DISPLAY_SPR_1D_LAYOUT | DISPLAY_SPR_ACTIVE);
-        vramSetBankA(VRAM_A_MAIN_BG); vramSetBankC(VRAM_C_SUB_BG);
-        bg0 = bgInit(0, BgType_Text8bpp, BgSize_T_256x256, 31,0);
-        bg0b = bgInitSub(0, BgType_Text8bpp, BgSize_T_256x256, 31,0);
-        bg1b = bgInitSub(1, BgType_Text8bpp, BgSize_T_256x256, 29, 0);
-        bgSetPriority(bg0b, 1);
-        bgSetPriority(bg1b, 0);        
-
-        decompress(backscreenTiles, bgGetGfxPtr(bg0b), LZ77Vram);
-        decompress(backscreenMap, (void*) bgGetMapPtr(bg0b), LZ77Vram);
-        dmaCopy((void *) backscreenPal,(u16*) BG_PALETTE_SUB,256*2);
-
-        decompress(topscreenTiles, bgGetGfxPtr(bg0), LZ77Vram);
-        decompress(topscreenMap, (void*) bgGetMapPtr(bg0), LZ77Vram);
-        dmaCopy((void *) topscreenPal,(u16*) BG_PALETTE,256*2);
+          videoSetMode(MODE_0_2D | DISPLAY_BG0_ACTIVE );
+          videoSetModeSub(MODE_0_2D | DISPLAY_BG0_ACTIVE | DISPLAY_BG1_ACTIVE | DISPLAY_SPR_1D_LAYOUT | DISPLAY_SPR_ACTIVE);
+          vramSetBankA(VRAM_A_MAIN_BG); vramSetBankC(VRAM_C_SUB_BG);
+          bg0 = bgInit(0, BgType_Text8bpp, BgSize_T_256x256, 31,0);
+          bg0b = bgInitSub(0, BgType_Text8bpp, BgSize_T_256x256, 31,0);
+          bg1b = bgInitSub(1, BgType_Text8bpp, BgSize_T_256x256, 29, 0);
+          bgSetPriority(bg0b, 1);
+          bgSetPriority(bg1b, 0);        
+  
+          decompress(backscreenTiles, bgGetGfxPtr(bg0b), LZ77Vram);
+          decompress(backscreenMap, (void*) bgGetMapPtr(bg0b), LZ77Vram);
+          dmaCopy((void *) backscreenPal,(u16*) BG_PALETTE_SUB,256*2);
+  
+          decompress(topscreenTiles, bgGetGfxPtr(bg0), LZ77Vram);
+          decompress(topscreenMap, (void*) bgGetMapPtr(bg0), LZ77Vram);
+          dmaCopy((void *) topscreenPal,(u16*) BG_PALETTE,256*2);
 #endif              
-        etatEmu = RAW_MENUSHOW;
-        break;
+          etatEmu = RAW_MENUSHOW;
+          break;
+          
+        case RAW_MENUSHOW:
+          etatEmu =  dsWaitOnMenu();
+          break;
         
-      case RAW_MENUSHOW:
-        etatEmu =  dsWaitOnMenu();
-        break;
-      
-      case RAW_MENUCRED:
-        decompress(backcreditTiles, bgGetGfxPtr(bg0b), LZ77Vram);
-        decompress(backcreditMap, (void*) bgGetMapPtr(bg0b), LZ77Vram);
-        dmaCopy((void *) backcreditPal,(u16*) BG_PALETTE_SUB,256*2);
-        while (keysCurrent())
-           ;
-        while (!keysCurrent())
-           ;
-        while (keysCurrent())
-           ;
-
-        etatEmu = RAW_MENUINIT;
-        break;
-       
-      case RAW_PLAYGAME:
-        {
-            memset((u8 *)0x06000000, 0x00, 0x20000); // Ensure screen is clear...
-            g_debugMask = 0; //| DBG_INFO; // DBG_LOGIC | DBG_BANK | DBG_VIDEO | DBG_SER | DBG_SND
-            SystemStub *stub = SystemStub_SDL_create();
-            Engine *e = new Engine(stub, dataPath, savePath);
-            e->run();
-            delete e;
-            delete stub;
-            etatEmu = RAW_MENUINIT;
-        }
-        break;
-        
-      case RAW_PLAYSGAM:
-        {
-            memset((u8 *)0x06000000, 0x00, 0x20000); // Ensure screen is clear...
-            g_debugMask = 0; //| DBG_INFO; // DBG_LOGIC | DBG_BANK | DBG_VIDEO | DBG_SER | DBG_SND
-            SystemStub *stub = SystemStub_SDL_create();
-            Engine *e = new Engine(stub, dataPath, savePath);
-            e->forceLoadState();
-            e->run();
-            delete e;
-            delete stub;
-            etatEmu = RAW_MENUINIT;
-        }
-        break;
-    }
+        case RAW_MENUCRED:
+          decompress(backcreditTiles, bgGetGfxPtr(bg0b), LZ77Vram);
+          decompress(backcreditMap, (void*) bgGetMapPtr(bg0b), LZ77Vram);
+          dmaCopy((void *) backcreditPal,(u16*) BG_PALETTE_SUB,256*2);
+          while (keysCurrent())
+             ;
+          while (!keysCurrent())
+             ;
+          while (keysCurrent())
+             ;
+  
+          etatEmu = RAW_MENUINIT;
+          break;
+         
+        case RAW_PLAYGAME:
+        case RAW_PLAYSGAM:
+          {
+              memset((u8 *)0x06000000, 0x00, 0x20000); // Ensure screen is clear...
+              g_debugMask = 0; //| DBG_INFO; // DBG_LOGIC | DBG_BANK | DBG_VIDEO | DBG_SER | DBG_SND
+              SystemStub *stub = SystemStub_SDL_create();
+              // Construct in place and point to it so it's all in fast DTCM memory
+              Engine *e = new (g_engineDtcmStorage) Engine(stub, dataPath, savePath);
+              if (etatEmu == RAW_PLAYSGAM) e->forceLoadState();
+              e->run();
+              e->~Engine(); // Call destructor manually. Can't call delete e as we have used DTCM memory for allocation
+              delete stub;
+              etatEmu = RAW_MENUINIT;
+          }
+          break;
+      }
     }
 
     return 0;

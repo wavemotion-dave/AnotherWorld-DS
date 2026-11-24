@@ -58,7 +58,7 @@ struct Mixer {
     void stopAll();
 	void mix(s16 *buf, int len);
 
-	static void mixCallback(void *param, u16 *buf, int len);
+	static void mixCallback(void *param, s16 *buf, int len);
 
 	void saveOrLoad(Serializer &ser);
 };

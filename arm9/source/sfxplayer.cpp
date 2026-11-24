@@ -201,6 +201,15 @@ ITCM_CODE uint32 SfxPlayer::eventsCallback(uint32 interval, void *param) {
 }
 
 void SfxPlayer::saveOrLoad(Serializer &ser) {
+    const bool loading = (ser._mode == Serializer::SM_LOAD);
+
+    if (loading && _resNum != 0) {
+        // music is playing now: kill its timer before _resNum gets overwritten,
+        // otherwise we end up with two timers driving handleEvents()
+        _stub->removeTimer(_timerId);
+        _resNum = 0;
+    }
+
     _stub->lockMutex(_mutex);
     Serializer::Entry entries[] = {
         SE_INT(&_delay, Serializer::SES_INT8, VER(2)),
@@ -211,10 +220,20 @@ void SfxPlayer::saveOrLoad(Serializer &ser) {
     };
     ser.saveOrLoadEntries(entries);
     _stub->unlockMutex(_mutex);
-    if (ser._mode == Serializer::SM_LOAD && _resNum != 0) {
-        uint16 delay = _delay;
-        loadSfxModule(_resNum, 0, _sfxMod.curOrder);
+
+    if (loading && _resNum != 0) {
+        const uint16 delay    = _delay;
+        const uint16 curPos   = _sfxMod.curPos;
+        const uint8  curOrder = _sfxMod.curOrder;
+
+        _sfxMod.data = 0;                    // detect a failed module load
+        loadSfxModule(_resNum, 0, curOrder); // memsets _sfxMod, rebuilds pointers
+        if (_sfxMod.data == 0 || _sfxMod.curOrder >= _sfxMod.numOrder) {
+            _resNum = 0;
+            return;
+        }
         _delay = delay;
+        _sfxMod.curPos = (curPos < 1024) ? (curPos & ~15) : 0; // restore position
         _timerId = _stub->addTimer(_delay, eventsCallback, this);
     }
 }

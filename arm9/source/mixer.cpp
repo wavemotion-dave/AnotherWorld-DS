@@ -84,8 +84,7 @@ void Mixer::stopAll() {
 // per-sample channel loop and keeps each channel's state in registers.
 ITCM_CODE static void mixBlock(Mixer *m, s16 *buf, int len) 
 {
-	static int32 acc[MIX_MAX_BLOCK];
-
+    static int32 acc[MIX_MAX_BLOCK];
 	memset(acc, 0, len * sizeof(int32));
 
 	for (int i = 0; i < Mixer::NUM_CHANNELS; ++i) {
@@ -156,12 +155,18 @@ ITCM_CODE void Mixer::mix(s16 *buf, int len) {
 	}
 }
 
-ITCM_CODE void Mixer::mixCallback(void *param, u16 *buf, int len) {
+ITCM_CODE void Mixer::mixCallback(void *param, s16 *buf, int len) {
 	((Mixer *)param)->mix((s16*)buf, len);
 }
 
 void Mixer::saveOrLoad(Serializer &ser) {
 	_stub->lockMutex(_mutex);
+
+	if (ser._mode == Serializer::SM_LOAD) {
+		// silence everything first so no stale channel plays during the load
+		memset(_channels, 0, sizeof(_channels));
+	}
+
 	for (int i = 0; i < NUM_CHANNELS; ++i) {
 		MixerChannel *ch = &_channels[i];
 		Serializer::Entry entries[] = {
@@ -176,6 +181,16 @@ void Mixer::saveOrLoad(Serializer &ser) {
 			SE_END()
 		};
 		ser.saveOrLoadEntries(entries);
+
+		if (ser._mode == Serializer::SM_LOAD && ch->active) {
+			const bool loop = (ch->chunk.loopLen != 0);
+			const uint32 end = loop ? (uint32)(ch->chunk.loopPos + ch->chunk.loopLen)
+			                        : (uint32)ch->chunk.len;
+			if (ch->chunk.data == 0 || end == 0 || ch->chunkInc == 0 ||
+			    (!loop && (ch->chunkPos >> 8) >= end - 1)) {
+				ch->active = false;
+			}
+		}
 	}
 	_stub->unlockMutex(_mutex);
-};
+}

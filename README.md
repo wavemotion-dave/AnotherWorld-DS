@@ -7,6 +7,10 @@ written by Eric Chahi at the beginning of the '90s. More information can be foun
 
 ![Another World](images/aw.png)
 
+This updated version takes the 2011 original port by Alekmaul and brings it up to date with the 
+latest libnds and DevKitPro - and ensures it will run under Twilight Menu++ on the DS/DSi/XL/LL. 
+It also fixes a few small bugs and improves the overall sound quality.
+
 Features :
 -----------------------
 It's fairly complete... save and restore of states, full sound, no slowdown even on older hardware...
